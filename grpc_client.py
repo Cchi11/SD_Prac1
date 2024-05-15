@@ -1,34 +1,48 @@
+import threading
+import time
+from concurrent import futures
+
 import grpc
-import unary_pb2_grpc as pb2_grpc
-import unary_pb2 as pb2
+import random
+# import the generated classes
+import private_chat_pb2
+import private_chat_pb2_grpc
+import socket
+
+from grpc_server import PrivateChatServicer
 
 
-class UnaryClient(object):
-    """
-    Client for gRPC functionality
-    """
-
-    def __init__(self):
-        self.host = 'localhost'
-        self.server_port = 50051
-
-        # instantiate a channel
-        self.channel = grpc.insecure_channel(
-            '{}:{}'.format(self.host, self.server_port))
-
-        # bind the client and the server
-        self.stub = pb2_grpc.UnaryStub(self.channel)
-
-    def get_url(self, message):
-        """
-        Client function to call the rpc for GetServerResponse
-        """
-        message = pb2.Message(message=message)
-        print(f'{message}')
-        return self.stub.GetServerResponse(message)
+class ChatClient:
+    def __init__(self, self_name):
+        self.name = self_name
+        self.port = random.randint(50000, 60000)
+        self.address = '0.0.0.0'
+        self.connection = self.address + ':' + str(self.port)
 
 
-if __name__ == '__main__':
-    client = UnaryClient()
-    result = client.get_url(message="Hello Server you there?")
-    print(f'{result}')
+self_name = input('Enter your name: ')
+client = ChatClient(self_name)
+
+# create a gRPC server
+server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+
+# use the generated function `add_InsultingServiceServicer_to_server`
+# to add the defined class to the server
+private_chat_pb2_grpc.add_PrivateChatServiceServicer_to_server(
+    PrivateChatServicer(), server)
+
+# listen on client port
+print('Starting server. Listening on port: ' + client.connection + '.')
+server.add_insecure_port(client.connection)
+server.start()
+
+other_client_port = input('Enter other client port: ')
+other_client_address = '0.0.0.0:' + other_client_port
+channel = grpc.insecure_channel(other_client_address)
+stub = private_chat_pb2_grpc.PrivateChatServiceStub(channel)
+
+while True:
+    input_message = input('Enter message: ')
+    message = private_chat_pb2.clientMessage(clientName=client.name, clientMessage=input_message)
+    stub.sendMessage(message)
+    time.sleep(1)

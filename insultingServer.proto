@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+message Insult {
+  string value = 1;
+}
+
+message Insults {
+  repeated string value = 1;
+}
+
+service InsultingService {
+  rpc GetInsults (Empty) returns (Insults) {}
+  rpc AddInsult (Insult) returns (Empty) {}
+  rpc InsultMe (Empty) returns (Insult) {}
+}
+
+message Empty{
+  
+}

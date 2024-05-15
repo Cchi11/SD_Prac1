@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+message clientMessage {
+  string clientName=1;
+  string clientMessage = 2;
+}
+
+service PrivateChatService {
+  rpc sendMessage(clientMessage) returns (Empty);
+}
+
+message Empty{
+
+}
