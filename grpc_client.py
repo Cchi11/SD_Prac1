@@ -41,8 +41,15 @@ other_client_address = '0.0.0.0:' + other_client_port
 channel = grpc.insecure_channel(other_client_address)
 stub = private_chat_pb2_grpc.PrivateChatServiceStub(channel)
 
-while True:
-    input_message = input('Enter message: ')
-    message = private_chat_pb2.clientMessage(clientName=client.name, clientMessage=input_message)
-    stub.sendMessage(message)
-    time.sleep(1)
+print('Connected to other client. Start chatting!')
+
+try:
+    while True:
+        input_message = input()
+        message = private_chat_pb2.clientMessage(clientName=client.name, clientMessage=input_message)
+        stub.sendMessage(message)
+        time.sleep(0.5)
+except KeyboardInterrupt:
+    server.stop(0)
+    print('Server stopped')
+    exit()

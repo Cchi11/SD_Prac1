@@ -10,7 +10,6 @@ from concurrent import futures
 class PrivateChatServicer(private_chat_pb2_grpc.PrivateChatServiceServicer):
 
     def sendMessage(self, request, context):
-        print()
         print(request.clientName + ': ' + request.clientMessage)
         response = private_chat_pb2.Empty()
         return response
