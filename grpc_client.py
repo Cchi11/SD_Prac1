@@ -7,21 +7,39 @@ import random
 # import the generated classes
 import private_chat_pb2
 import private_chat_pb2_grpc
+import name_server_pb2
+import name_server_pb2_grpc
 import socket
 
 from grpc_server import PrivateChatServicer
 
 
 class ChatClient:
-    def __init__(self, self_name):
+    def __init__(self, self_name, self_connection):
         self.name = self_name
-        self.port = random.randint(50000, 60000)
-        self.address = '0.0.0.0'
-        self.connection = self.address + ':' + str(self.port)
+        self.connection = self_connection
 
+
+# Connect to NameServer
+redis_channel = grpc.insecure_channel('0.0.0.0:50051')
+redis_stub = name_server_pb2_grpc.NameServerStub(redis_channel)
 
 self_name = input('Enter your name: ')
-client = ChatClient(self_name)
+
+self_client = name_server_pb2.ClientNameRequest(client_name=
+                                                self_name)
+self_client_address = redis_stub.GetClientInfo(self_client)
+
+while True:
+    if self_client_address.connectionInfo.client_address_and_port:
+        self_client_address = self_client_address.connectionInfo.client_address_and_port
+        break
+    else:
+        self_name = input('Client not found. Enter your name: ')
+        self_client = name_server_pb2.ClientNameRequest(client_name=self_name)
+        self_client_address = redis_stub.GetClientInfo(self_client)
+
+client = ChatClient(self_name, self_client_address)
 
 # create a gRPC server
 server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
@@ -36,8 +54,20 @@ print('Starting server. Listening on port: ' + client.connection + '.')
 server.add_insecure_port(client.connection)
 server.start()
 
-other_client_port = input('Enter other client port: ')
-other_client_address = '0.0.0.0:' + other_client_port
+# get other client address
+other_client_name = input('Enter other client_name: ')
+other_client = name_server_pb2.ClientNameRequest(client_name=other_client_name)
+other_client_grpc = redis_stub.GetClientInfo(other_client)
+other_client_address = None
+while True:
+    if other_client_grpc.connectionInfo.client_address_and_port:
+        other_client_address = other_client_grpc.connectionInfo.client_address_and_port
+        break
+    else:
+        other_client_name = input('Client not found. Enter other client_name: ')
+        other_client = name_server_pb2.ClientNameRequest(client_name=other_client_name)
+        other_client_address = redis_stub.GetClientInfo(other_client)
+
 channel = grpc.insecure_channel(other_client_address)
 stub = private_chat_pb2_grpc.PrivateChatServiceStub(channel)
 
