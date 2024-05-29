@@ -14,7 +14,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x12private_chat.proto\":\n\rclientMessage\x12\x12\n\nclientName\x18\x01 \x01(\t\x12\x15\n\rclientMessage\x18\x02 \x01(\t\"\x07\n\x05\x45mpty2;\n\x12PrivateChatService\x12%\n\x0bsendMessage\x12\x0e.clientMessage\x1a\x06.Emptyb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x12private_chat.proto\":\n\rclientMessage\x12\x12\n\nclientName\x18\x01 \x01(\t\x12\x15\n\rclientMessage\x18\x02 \x01(\t\"\x07\n\x05\x45mpty2]\n\x12PrivateChatService\x12%\n\x0bsendMessage\x12\x0e.clientMessage\x1a\x06.Empty\x12 \n\x0eisClientActive\x12\x06.Empty\x1a\x06.Emptyb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -26,5 +26,5 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_EMPTY']._serialized_start=82
   _globals['_EMPTY']._serialized_end=89
   _globals['_PRIVATECHATSERVICE']._serialized_start=91
-  _globals['_PRIVATECHATSERVICE']._serialized_end=150
+  _globals['_PRIVATECHATSERVICE']._serialized_end=184
 # @@protoc_insertion_point(module_scope)

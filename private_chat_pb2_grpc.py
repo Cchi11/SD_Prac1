@@ -44,6 +44,11 @@ class PrivateChatServiceStub(object):
                 request_serializer=private__chat__pb2.clientMessage.SerializeToString,
                 response_deserializer=private__chat__pb2.Empty.FromString,
                 _registered_method=True)
+        self.isClientActive = channel.unary_unary(
+                '/PrivateChatService/isClientActive',
+                request_serializer=private__chat__pb2.Empty.SerializeToString,
+                response_deserializer=private__chat__pb2.Empty.FromString,
+                _registered_method=True)
 
 
 class PrivateChatServiceServicer(object):
@@ -55,12 +60,23 @@ class PrivateChatServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def isClientActive(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_PrivateChatServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'sendMessage': grpc.unary_unary_rpc_method_handler(
                     servicer.sendMessage,
                     request_deserializer=private__chat__pb2.clientMessage.FromString,
+                    response_serializer=private__chat__pb2.Empty.SerializeToString,
+            ),
+            'isClientActive': grpc.unary_unary_rpc_method_handler(
+                    servicer.isClientActive,
+                    request_deserializer=private__chat__pb2.Empty.FromString,
                     response_serializer=private__chat__pb2.Empty.SerializeToString,
             ),
     }
@@ -89,6 +105,33 @@ class PrivateChatService(object):
             target,
             '/PrivateChatService/sendMessage',
             private__chat__pb2.clientMessage.SerializeToString,
+            private__chat__pb2.Empty.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def isClientActive(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/PrivateChatService/isClientActive',
+            private__chat__pb2.Empty.SerializeToString,
             private__chat__pb2.Empty.FromString,
             options,
             channel_credentials,

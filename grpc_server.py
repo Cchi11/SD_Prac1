@@ -14,3 +14,7 @@ class PrivateChatServicer(private_chat_pb2_grpc.PrivateChatServiceServicer):
         response = private_chat_pb2.Empty()
         return response
 
+    def isClientActive(self, request, context):
+        response = private_chat_pb2.Empty()
+        return response
+
