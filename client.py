@@ -107,6 +107,7 @@ def privateChat(user: ChatClient):
     except KeyboardInterrupt:
         server.stop(0)
         channel.close()
+        print()
         print('Exit privateChat with ' + other_client_name + '.')
 
 
