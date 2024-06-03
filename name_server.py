@@ -1,4 +1,6 @@
 import grpc
+import yaml
+
 import name_server_pb2
 import name_server_pb2_grpc
 
@@ -46,6 +48,20 @@ def serve():
     server.add_insecure_port('0.0.0.0:50051')
     print("Starting server. Listening on port 50051.")
     server.start()
+    # Connect to NameServer
+    redis_channel = grpc.insecure_channel('0.0.0.0:50051')
+    redis_stub = name_server_pb2_grpc.NameServerStub(redis_channel)
+
+    # Leer el archivo YAML
+    with open('clients.yaml', 'r') as file:
+        data = yaml.safe_load(file)
+
+    for client in data['clients']:
+        name = client['name']
+        client_ip_address = client['ip'] + ':' + str(client['port'])
+        addClient = name_server_pb2.AddClientRequest(client_name=name, client_address_and_port=client_ip_address)
+        redis_stub.AddToNameServer(addClient)
+
     try:
         server.wait_for_termination()
     except KeyboardInterrupt:
