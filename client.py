@@ -166,5 +166,6 @@ try:
         else:
             print('Invalid option')
 except KeyboardInterrupt:
+    print()
     print('Exiting...')
     exit()
