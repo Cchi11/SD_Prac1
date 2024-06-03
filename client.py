@@ -3,6 +3,7 @@ import time
 from concurrent import futures
 
 import grpc
+import yaml
 import random
 # import the generated classes
 import private_chat_pb2
@@ -53,6 +54,12 @@ def privateChat(user: ChatClient):
     try:
         while True:
             other_client_name = input('Enter other client_name: ')
+            if other_client_name == user.name:
+                print()
+                print('You cannot chat with yourself')
+                print()
+                continue
+
             other_client = name_server_pb2.ClientNameRequest(client_name=other_client_name)
             other_client_grpc = redis_stub.GetClientInfo(other_client)
             other_client_address = None
@@ -118,25 +125,33 @@ def accessInsultChannel():
 # -----------------------------------------------------------------------------------------------------------------------
 # Main - start code
 
+
 # Connect to NameServer
 redis_channel = grpc.insecure_channel('0.0.0.0:50051')
 redis_stub = name_server_pb2_grpc.NameServerStub(redis_channel)
 
-self_name = input('Enter your name: ')
+# Leer el archivo YAML
+with open('clients.yaml', 'r') as file:
+    data = yaml.safe_load(file)
 
-self_client = name_server_pb2.ClientNameRequest(client_name=
-                                                self_name)
-self_client_address = redis_stub.GetClientInfo(self_client)
+for client in data['clients']:
+    name = client['name']
+    client_ip_address = client['ip'] + ':' + str(client['port'])
+    addClient = name_server_pb2.AddClientRequest(client_name=name, client_address_and_port=client_ip_address)
+    redis_stub.AddToNameServer(addClient)
+
 
 # log in
 while True:
+    self_name = input('Enter your name: ')
+    self_client = name_server_pb2.ClientNameRequest(client_name=self_name)
+    self_client_address = redis_stub.GetClientInfo(self_client)
+
     if self_client_address.connectionInfo.client_address_and_port:
         self_client_address = self_client_address.connectionInfo.client_address_and_port
         break
     else:
-        self_name = input('Client not found. Enter your name: ')
-        self_client = name_server_pb2.ClientNameRequest(client_name=self_name)
-        self_client_address = redis_stub.GetClientInfo(self_client)
+        print('Client not found')
 
 # if login successfully, create a ChatClient instance
 client = ChatClient(self_name, self_client_address)

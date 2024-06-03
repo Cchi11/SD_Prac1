@@ -1,0 +1,31 @@
+clients:
+  - name: client1
+    ip: 127.0.0.1
+    port: 50001
+  - name: client2
+    ip: 127.0.0.2
+    port: 50002
+  - name: client3
+    ip: 127.0.0.3
+    port: 50003
+  - name: client4
+    ip: 127.0.0.4
+    port: 50004
+  - name: client5
+    ip: 127.0.0.5
+    port: 50005
+  - name: client6
+    ip: 127.0.0.6
+    port: 50006
+  - name: client7
+    ip: 127.0.0.7
+    port: 50007
+  - name: client8
+    ip: 127.0.0.8
+    port: 50008
+  - name: client9
+    ip: 127.0.0.9
+    port: 50009
+  - name: client10
+    ip: 127.0.0.10
+    port: 50010
