@@ -62,6 +62,9 @@ def serve():
         addClient = name_server_pb2.AddClientRequest(client_name=name, client_address_and_port=client_ip_address)
         redis_stub.AddToNameServer(addClient)
 
+    # close connection
+    redis_channel.close()
+
     try:
         server.wait_for_termination()
     except KeyboardInterrupt:

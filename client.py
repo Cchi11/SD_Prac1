@@ -3,6 +3,7 @@ import time
 from concurrent import futures
 
 import grpc
+import pika
 import yaml
 import random
 # import the generated classes
@@ -39,8 +40,6 @@ def printMenu():
 
 def privateChat(user: ChatClient):
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    # use the generated function `add_InsultingServiceServicer_to_server`
-    # to add the defined class to the server
     private_chat_pb2_grpc.add_PrivateChatServiceServicer_to_server(
         PrivateChatServicer(), server)
     # listen on client port
@@ -111,8 +110,52 @@ def privateChat(user: ChatClient):
         print('Exit privateChat with ' + other_client_name + '.')
 
 
-def subscribeToGroupChat():
-    pass
+def GroupChat(user: ChatClient):
+    # Connect to RabbitMQ
+    connection_params = pika.ConnectionParameters('localhost')
+    connection = pika.BlockingConnection(connection_params)
+    channel = connection.channel()
+
+    group_name = input('Enter group name: ')
+    channel.exchange_declare(exchange=group_name, exchange_type='fanout')
+
+    queue_name = user.name + '_' + group_name + '_queue'
+
+    # Declare queue to each member of the group
+    result = channel.queue_declare(queue_name, exclusive=True)
+    queue_name = result.method.queue
+
+    # Asocia cada cola al exchange
+    channel.queue_bind(exchange=group_name, queue=queue_name)
+
+    def callback(ch, method, properties, body):
+        print(body.decode())
+    # Configure the consumer
+    channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=True)
+    print()
+    print(f"Connected to group {group_name}")
+    print("Listening to messages right now")
+    print("Press Ctrl+C to send a message")
+    print()
+    try:
+        while True:
+
+            try:
+                channel.start_consuming()
+
+            except KeyboardInterrupt:
+                print()
+                message = input("Enter your message: ")
+                message = '[' + user.name + '] ' + message
+                channel.basic_publish(exchange=group_name, routing_key='', body=message.encode())
+                # print(f" [x] Sent {message}")
+                continue
+
+    except KeyboardInterrupt:
+        print()
+        print('Exiting...')
+        connection.close()
+        exit()
 
 
 def discoverChat():
@@ -157,6 +200,7 @@ try:
             privateChat(client)
         elif option == '2':
             print('Subscribe to group chat')
+            GroupChat(client)
         elif option == '3':
             print('Discover chat')
         elif option == '4':
