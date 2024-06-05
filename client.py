@@ -181,8 +181,56 @@ def discoverChat():
     pass
 
 
-def accessInsultChannel():
-    pass
+def accessInsultChannel(user_client: ChatClient):
+    # Connection RabbitMQ
+    connection = None
+    try:
+        connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+        channel = connection.channel()
+
+        # Declare queue
+        channel.queue_declare(queue='insult_queue')
+
+        def callback(ch, method, properties, body):
+            print(f"{body.decode()}")
+
+        # Configure consumer
+        channel.basic_consume(queue='insult_queue', on_message_callback=callback, auto_ack=True)
+
+        # ESend an insult
+        def send_insult(insult):
+            channel.basic_publish(exchange='',
+                                  routing_key='insult_queue',
+                                  body=insult)
+            print(f"Sent: {insult}")
+
+        while True:
+            print("=" * 45)
+            print(f"{'|':<2}{' Select an option:':^41}{'|':>2}")
+            print(f"{'|':<2}{' 1. Send insult ':^41}{'|':>2}")
+            print(f"{'|':<2}{' 2. Receive insult':^41}{'|':>2}")
+            print("=" * 45)
+            options = input('Enter option: ')
+
+            if options == '1':
+                insult_string = input('Enter insult: ')
+                insult_string = '[' + user_client.name + '] ' + insult_string
+                send_insult(insult_string)
+            else:
+                try:
+                    print()
+                    print("=" * 60)
+                    print('Receiving insults. Press Ctrl+C to stop receiving insults')
+                    print("=" * 60)
+                    channel.start_consuming()
+                except KeyboardInterrupt:
+                    print()
+                    continue
+
+        connection.close()
+    except KeyboardInterrupt:
+        connection.close()
+        return
 
 
 # -----------------------------------------------------------------------------------------------------------------------
@@ -225,7 +273,8 @@ try:
         elif option == '3':
             print('Discover chat')
         elif option == '4':
-            print('Access insult channel')
+            printHeader(' INSULT CHANNEL')
+            accessInsultChannel(client)
         elif option == '5':
             break
         else:
