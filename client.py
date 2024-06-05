@@ -22,19 +22,32 @@ class ChatClient:
         self.connection = self_connection
 
 
+def printHeader(string):
+    print()
+    print("╔" + "═" * 50 + "╗")
+    print("║{:50}║".format(string))
+    print("╚" + "═" * 50 + "╝")
+    print()
+
+
 def printMenu():
     print()
-    print("+" + "-" * 28 + "+")
-    print("|" + " " * 28 + "|")
-    print("|      Chat Application      |")
-    print("|" + " " * 28 + "|")
-    print("+" + "-" * 28 + "+")
-    print("| 1. Connect chat            |")
-    print("| 2. Subscribe to group chat |")
-    print("| 3. Discover chat           |")
-    print("| 4. Access insult channel   |")
-    print("| 5. Exit                    |")
-    print("+" + "-" * 28 + "+")
+    print("╔" + "═" * 50 + "╗")
+    print("║" + " " * 50 + "║")
+    print("║{:^50}║".format(" ██████╗██╗  ██╗ █████╗ ████████╗ "))
+    print("║{:^50}║".format("██╔════╝██║  ██║██╔══██╗╚══██╔══╝"))
+    print("║{:^50}║".format("██║     ███████║███████║   ██║   "))
+    print("║{:^50}║".format("██║     ██╔══██║██╔══██║   ██║   "))
+    print("║{:^50}║".format("╚██████╗██║  ██║██║  ██║   ██║   "))
+    print("║{:^50}║".format(" ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝   "))
+    print("║" + " " * 50 + "║")
+    print("╠" + "═" * 50 + "╣")
+    print("║{:50}║".format(" 1. Connect chat"))
+    print("║{:50}║".format(" 2. Subscribe to group chat"))
+    print("║{:50}║".format(" 3. Discover chat"))
+    print("║{:50}║".format(" 4. Access insult channel"))
+    print("║{:50}║".format(" 5. Exit"))
+    print("╚" + "═" * 50 + "╝")
     print()
 
 
@@ -111,51 +124,57 @@ def privateChat(user: ChatClient):
 
 
 def GroupChat(user: ChatClient):
-    # Connect to RabbitMQ
-    connection_params = pika.ConnectionParameters('localhost')
-    connection = pika.BlockingConnection(connection_params)
-    channel = connection.channel()
-
-    group_name = input('Enter group name: ')
-    channel.exchange_declare(exchange=group_name, exchange_type='fanout')
-
-    queue_name = user.name + '_' + group_name + '_queue'
-
-    # Declare queue to each member of the group
-    result = channel.queue_declare(queue_name, exclusive=True)
-    queue_name = result.method.queue
-
-    # Asocia cada cola al exchange
-    channel.queue_bind(exchange=group_name, queue=queue_name)
-
-    def callback(ch, method, properties, body):
-        print(body.decode())
-    # Configure the consumer
-    channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=True)
-    print()
-    print(f"Connected to group {group_name}")
-    print("Listening to messages right now")
-    print("Press Ctrl+C to send a message")
-    print()
     try:
-        while True:
+        # Connect to RabbitMQ
+        connection_params = pika.ConnectionParameters('localhost')
+        connection = pika.BlockingConnection(connection_params)
+        channel = connection.channel()
 
-            try:
-                channel.start_consuming()
+        group_name = input('Enter group name: ')
+        channel.exchange_declare(exchange=group_name, exchange_type='fanout')
 
-            except KeyboardInterrupt:
-                print()
-                message = input("Enter your message: ")
-                message = '[' + user.name + '] ' + message
-                channel.basic_publish(exchange=group_name, routing_key='', body=message.encode())
-                # print(f" [x] Sent {message}")
-                continue
+        queue_name = user.name + '_' + group_name + '_queue'
+
+        # Declare queue to each member of the group
+        result = channel.queue_declare(queue_name, exclusive=True)
+        queue_name = result.method.queue
+
+        # Asocia cada cola al exchange
+        channel.queue_bind(exchange=group_name, queue=queue_name)
+
+        def callback(ch, method, properties, body):
+            print(body.decode())
+
+        # Configure the consumer
+        channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=True)
+        print("=" * 45)
+        print(f"{'|':<2}{' Connected to group ' + group_name + ' ':^41}{'|':>2}")
+        print(f"{'|':<2}{' Listening to messages right now ':^41}{'|':>2}")
+        print(f"{'|':<2}{' Press Ctrl+C to send a message ':^41}{'|':>2}")
+        print("=" * 45)
+
+        try:
+            while True:
+
+                try:
+                    channel.start_consuming()
+
+                except KeyboardInterrupt:
+                    print()
+                    message = input()
+                    message = '[' + user.name + '] ' + message
+                    channel.basic_publish(exchange=group_name, routing_key='', body=message.encode())
+                    # print(f" [x] Sent {message}")
+                    continue
+
+        except KeyboardInterrupt:
+            print()
+            print('Exiting GroupChat...')
+            connection.close()
+            return
 
     except KeyboardInterrupt:
-        print()
-        print('Exiting...')
-        connection.close()
-        exit()
+        return
 
 
 def discoverChat():
@@ -176,6 +195,7 @@ redis_stub = name_server_pb2_grpc.NameServerStub(redis_channel)
 
 # log in
 while True:
+    printHeader(' LOG IN TO USE CHAT APPLICATION')
     self_name = input('Enter your name: ')
     self_client = name_server_pb2.ClientNameRequest(client_name=self_name)
     self_client_address = redis_stub.GetClientInfo(self_client)
@@ -197,9 +217,10 @@ try:
         option = input('Enter option: ')
         print()
         if option == '1':
+            printHeader(' PRIVATE CHAT')
             privateChat(client)
         elif option == '2':
-            print('Subscribe to group chat')
+            printHeader(' SUBSCRIBE TO GROUP CHAT')
             GroupChat(client)
         elif option == '3':
             print('Discover chat')
