@@ -143,7 +143,8 @@ def GroupChat(user: ChatClient):
         channel.queue_bind(exchange=group_name, queue=queue_name)
 
         def callback(ch, method, properties, body):
-            print(body.decode())
+            if properties.headers['sender'] != user.name:
+                print(body.decode())
 
         # Configure the consumer
         channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=True)
@@ -163,7 +164,8 @@ def GroupChat(user: ChatClient):
                     print()
                     message = input()
                     message = '[' + user.name + '] ' + message
-                    channel.basic_publish(exchange=group_name, routing_key='', body=message.encode())
+                    channel.basic_publish(exchange=group_name, routing_key='', body=message.encode(),
+                                          properties=pika.BasicProperties(headers={'sender': user.name}))
                     # print(f" [x] Sent {message}")
                     continue
 
