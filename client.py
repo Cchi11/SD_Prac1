@@ -6,6 +6,9 @@ import grpc
 import pika
 import yaml
 import random
+
+from pika.exceptions import ChannelClosedByBroker
+
 # import the generated classes
 import private_chat_pb2
 import private_chat_pb2_grpc
@@ -49,6 +52,26 @@ def printMenu():
     print("║{:50}║".format(" 5. Exit"))
     print("╚" + "═" * 50 + "╝")
     print()
+
+
+def printMenuGrupalChat():
+    try:
+        while True:
+            print("=" * 45)
+            print(f"{'|':<2}{' Group Chat Options ':^41}{'|':>2}")
+            print("=" * 45)
+            print(f"{'| 1. Persistent Group Chat':<44}{'|':>1}")
+            print(f"{'| 2. Transient Group Chat':<44}{'|':>1}")
+            print("=" * 45)
+
+            choice = input("Select an option (1 or 2): ")
+
+            if choice in ['1', '2']:
+                return choice
+            else:
+                print("Invalid choice. Please select either 1 or 2.")
+    except KeyboardInterrupt:
+        return None
 
 
 def privateChat(user: ChatClient):
@@ -124,19 +147,44 @@ def privateChat(user: ChatClient):
 
 
 def GroupChat(user: ChatClient):
+    choice = printMenuGrupalChat()
+
+    if choice == '1':
+        GroupChatP(user)
+    else:
+        if choice == '2':
+            GroupChatT(user)
+        else:
+            return
+
+
+def GroupChatT(user: ChatClient):
     try:
         # Connect to RabbitMQ
         connection_params = pika.ConnectionParameters('localhost')
         connection = pika.BlockingConnection(connection_params)
         channel = connection.channel()
 
-        group_name = input('Enter group name: ')
-        channel.exchange_declare(exchange=group_name, exchange_type='fanout')
+        try:
+            while True:
+                try:
+                    group_name = input('Enter group name: ')
+                    channel.exchange_declare(exchange=group_name, exchange_type='fanout', durable=False)
+                    break
+                except ChannelClosedByBroker:
+                    print('Name of group is invalid. Please try again.')
+                    channel = connection.channel()
+                    continue
+                except KeyboardInterrupt:
+                    return
+        except KeyboardInterrupt:
+            return
+
 
         queue_name = user.name + '_' + group_name + '_queue'
 
         # Declare queue to each member of the group
-        result = channel.queue_declare(queue_name, exclusive=True)
+        result = channel.queue_declare(queue=queue_name, exclusive=True)
         queue_name = result.method.queue
 
         # Asocia cada cola al exchange
@@ -175,6 +223,71 @@ def GroupChat(user: ChatClient):
             connection.close()
             return
 
+    except KeyboardInterrupt:
+        return
+
+
+def GroupChatP(user: ChatClient):
+    # Connect to RabbitMQ
+    connection_params = pika.ConnectionParameters('localhost')
+    connection = pika.BlockingConnection(connection_params)
+    channel = connection.channel()
+
+    try:
+        while True:
+            try:
+                group_name = input('Enter group name: ')
+                channel.exchange_declare(exchange=group_name, exchange_type='fanout', durable=True)
+                break
+            except ChannelClosedByBroker:
+                print('Name of group is invalid. Please try again.')
+                continue
+            except KeyboardInterrupt:
+                return
+    except KeyboardInterrupt:
+        return
+
+    queue_name = user.name + '_' + group_name + '_queue'
+
+    # Declare queue to each member of the group
+    result = channel.queue_declare(queue=queue_name, durable=True)
+    queue_name = result.method.queue
+
+    # Asocia cada cola al exchange
+    channel.queue_bind(exchange=group_name, queue=queue_name)
+
+    def callback(ch, method, properties, body):
+        if properties.headers['sender'] != user.name:
+            print(body.decode())
+
+    # Configure the consumer
+    channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=True)
+    print("=" * 45)
+    print(f"{'|':<2}{' Connected to group ' + group_name + ' ':^41}{'|':>2}")
+    print(f"{'|':<2}{' Listening to messages right now ':^41}{'|':>2}")
+    print(f"{'|':<2}{' Press Ctrl+C to send a message ':^41}{'|':>2}")
+    print("=" * 45)
+
+    try:
+        while True:
+            try:
+                channel.start_consuming()
+            except KeyboardInterrupt:
+                print()
+                message = input("[" + user.name + "]")
+                message = '[' + user.name + '] ' + message
+                channel.basic_publish(exchange=group_name, routing_key='', body=message.encode(),
+                                      properties=pika.BasicProperties(
+                                          headers={'sender': user.name},
+                                          delivery_mode=2  # Make message persistent
+                                      ))
+                # print(f" [x] Sent {message}")
+                continue
+    except KeyboardInterrupt:
+        print()
+        print('Exiting GroupChat...')
+        connection.close()
+        return
     except KeyboardInterrupt:
         return
 
