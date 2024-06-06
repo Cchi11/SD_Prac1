@@ -1,5 +1,7 @@
+import json
 import threading
 import time
+import uuid
 from concurrent import futures
 
 import grpc
@@ -75,6 +77,24 @@ def printMenuGrupalChat():
     except KeyboardInterrupt:
         return None
 
+def printMenuGrupalChat():
+    try:
+        while True:
+            print("=" * 45)
+            print(f"{'|':<2}{' Group Chat Options ':^41}{'|':>2}")
+            print("=" * 45)
+            print(f"{'| 1. Publish a Discovery Event':<44}{'|':>1}")
+            print(f"{'| 2. Respond to a Discovery Event':<44}{'|':>1}")
+            print("=" * 45)
+
+            choice = input("Select an option (1 or 2): ")
+
+            if choice in ['1', '2']:
+                return choice
+            else:
+                print("Invalid choice. Please select either 1 or 2.")
+    except KeyboardInterrupt:
+        return None
 
 def privateChat(user: ChatClient):
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
@@ -295,35 +315,100 @@ def GroupChatP(user: ChatClient):
         return
 
 
-def discoverChat():
-    # RabbitMQ
-    rabbitmq_host = 'localhost'
-    rabbitmq_port = 15672
-    username = 'guest'
-    password = 'guest'
+def discoverChat(user: ChatClient):
+    choice = printMenuGrupalChat()
 
-    # URL
-    url = f'http://{rabbitmq_host}:{rabbitmq_port}/api/exchanges'
-
-    # Get request
-    response = requests.get(url, auth=HTTPBasicAuth(username, password))
-
-    # List of default exchanges
-    default_exchanges = ['', 'amq.direct', 'amq.fanout', 'amq.headers', 'amq.match', 'amq.rabbitmq.trace', 'amq.topic']
-
-    # Check response
-    if response.status_code == 200:
-        exchanges = response.json()
-        print("Lista de exchanges creados por el usuario:")
-        # Print exchanges
-        for exchange in exchanges:
-            # Check if exchange is not a default exchange
-            if exchange['name'] not in default_exchanges:
-                print(f"Name: {exchange['name']}")
+    if choice == '1':
+        discoverChatP(user)
     else:
-        print(f"Error: {response.status_code}")
-        print(response.text)
+        if choice == '2':
+            discoverChatR(user)
+        else:
+            return
 
+
+
+def discoverChatP(user: ChatClient):
+    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    channel = connection.channel()
+
+    # Declarar el intercambio
+    channel.exchange_declare(exchange='chat_discovery', exchange_type='fanout')
+
+    # Declarar una cola exclusiva para recibir respuestas
+    result = channel.queue_declare(queue='', exclusive=True)
+    queue_name = result.method.queue
+
+    # Publicar el evento de descubrimiento incluyendo el nombre de la cola para respuestas
+    discovery_event = {
+        'username': user.name,
+        'type': 'discovery_request',
+        'reply_to': queue_name
+    }
+    channel.basic_publish(exchange='chat_discovery', routing_key='', body=json.dumps(discovery_event))
+    print("Public event of discovery.")
+
+    responses = []
+
+    def on_response(ch, method, properties, body):
+        message = json.loads(body)
+        if message['type'] == 'discovery_response':
+            responses.append(message)
+
+    # Configurar suscripción en la cola
+    channel.basic_consume(queue=queue_name, on_message_callback=on_response, auto_ack=True)
+
+    # Esperar respuestas durante un tiempo determinado (e.g., 10 segundos)
+    print("Waiting for responses. To exit, press CTRL+C")
+    while True:
+        try:
+            channel.start_consuming()
+        except KeyboardInterrupt:
+            break
+
+    # Mostrar respuestas recibidas en la interfaz de usuario
+    print("\nResponses received:")
+    for response in responses:
+        print(f"User: {response['username']}, Connection parameters: {response['connection_params']}")
+
+    # Cerrar la conexión
+    connection.close()
+
+def discoverChatR(user: ChatClient):
+    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    channel = connection.channel()
+
+    # Declarar el intercambio
+    channel.exchange_declare(exchange='chat_discovery', exchange_type='fanout')
+
+    # Declarar una cola para este cliente
+    result = channel.queue_declare(queue='', exclusive=True)
+    queue_name = result.method.queue
+
+    # Vincular la cola al intercambio
+    channel.queue_bind(exchange='chat_discovery', queue=queue_name)
+
+    def on_discovery_event(ch, method, properties, body):
+        message = json.loads(body)
+        if message['type'] == 'discovery_request':
+            # Responder con parámetros de conexión al reply_to especificado
+            response_event = {
+                'username': user.name,
+                'connection_params': user.connection,
+                'type': 'discovery_response'
+            }
+            channel.basic_publish(exchange='', routing_key=message['reply_to'], body=json.dumps(response_event))
+            print(f"Responded to {message['username']} discovery event.")
+
+    # Configurar suscripción en la cola
+    channel.basic_consume(queue=queue_name, on_message_callback=on_discovery_event, auto_ack=True)
+
+    print("Waiting for discovery events. To exit, press CTRL+C")
+    try:
+        channel.start_consuming()
+    except KeyboardInterrupt:
+        channel.stop_consuming()
+        connection.close()
 
 def accessInsultChannel(user_client: ChatClient):
     # Connection RabbitMQ
@@ -423,7 +508,7 @@ try:
             GroupChat(client)
         elif option == '3':
             printHeader(' DISCOVER CHAT')
-            discoverChat()
+            discoverChat(client)
         elif option == '4':
             printHeader(' INSULT CHANNEL')
             accessInsultChannel(client)
