@@ -77,6 +77,7 @@ def printMenuGrupalChat():
     except KeyboardInterrupt:
         return None
 
+
 def printMenuGrupalChat():
     try:
         while True:
@@ -95,6 +96,7 @@ def printMenuGrupalChat():
                 print("Invalid choice. Please select either 1 or 2.")
     except KeyboardInterrupt:
         return None
+
 
 def privateChat(user: ChatClient):
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
@@ -327,7 +329,6 @@ def discoverChat(user: ChatClient):
             return
 
 
-
 def discoverChatP(user: ChatClient):
     connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
     channel = connection.channel()
@@ -345,13 +346,13 @@ def discoverChatP(user: ChatClient):
         'type': 'discovery_request',
         'reply_to': queue_name
     }
-    channel.basic_publish(exchange='chat_discovery', routing_key='', body=json.dumps(discovery_event))
+    channel.basic_publish(exchange='chat_discovery', routing_key='', body=json.dumps(discovery_event).encode())
     print("Public event of discovery.")
 
     responses = []
 
     def on_response(ch, method, properties, body):
-        message = json.loads(body)
+        message = json.loads(body.decode())
         if message['type'] == 'discovery_response':
             responses.append(message)
 
@@ -374,6 +375,7 @@ def discoverChatP(user: ChatClient):
     # Cerrar la conexión
     connection.close()
 
+
 def discoverChatR(user: ChatClient):
     connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
     channel = connection.channel()
@@ -389,7 +391,7 @@ def discoverChatR(user: ChatClient):
     channel.queue_bind(exchange='chat_discovery', queue=queue_name)
 
     def on_discovery_event(ch, method, properties, body):
-        message = json.loads(body)
+        message = json.loads(body.decode())
         if message['type'] == 'discovery_request':
             # Responder con parámetros de conexión al reply_to especificado
             response_event = {
@@ -397,7 +399,8 @@ def discoverChatR(user: ChatClient):
                 'connection_params': user.connection,
                 'type': 'discovery_response'
             }
-            channel.basic_publish(exchange='', routing_key=message['reply_to'], body=json.dumps(response_event))
+            channel.basic_publish(exchange='', routing_key=message['reply_to'],
+                                  body=json.dumps(response_event).encode())
             print(f"Responded to {message['username']} discovery event.")
 
     # Configurar suscripción en la cola
@@ -409,6 +412,7 @@ def discoverChatR(user: ChatClient):
     except KeyboardInterrupt:
         channel.stop_consuming()
         connection.close()
+
 
 def accessInsultChannel(user_client: ChatClient):
     # Connection RabbitMQ
