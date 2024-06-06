@@ -1,13 +1,9 @@
 import json
-import threading
 import time
-import uuid
 from concurrent import futures
 
 import grpc
 import pika
-import yaml
-import random
 
 from pika.exceptions import ChannelClosedByBroker
 
@@ -16,10 +12,7 @@ import private_chat_pb2
 import private_chat_pb2_grpc
 import name_server_pb2
 import name_server_pb2_grpc
-import socket
-import requests
 
-from requests.auth import HTTPBasicAuth
 from grpc_server import PrivateChatServicer
 
 
@@ -78,7 +71,7 @@ def printMenuGrupalChat():
         return None
 
 
-def printMenuGrupalChat():
+def printMenudiscoverChat():
     try:
         while True:
             print("=" * 45)
@@ -333,14 +326,14 @@ def discoverChatP(user: ChatClient):
     connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
     channel = connection.channel()
 
-    # Declarar el intercambio
+    # Declare exchange
     channel.exchange_declare(exchange='chat_discovery', exchange_type='fanout')
 
-    # Declarar una cola exclusiva para recibir respuestas
+    # Declare a queue for this client
     result = channel.queue_declare(queue='', exclusive=True)
     queue_name = result.method.queue
 
-    # Publicar el evento de descubrimiento incluyendo el nombre de la cola para respuestas
+    # Publish a discovery event
     discovery_event = {
         'username': user.name,
         'type': 'discovery_request',
@@ -356,10 +349,10 @@ def discoverChatP(user: ChatClient):
         if message['type'] == 'discovery_response':
             responses.append(message)
 
-    # Configurar suscripción en la cola
+    # Configure subscription in the queue
     channel.basic_consume(queue=queue_name, on_message_callback=on_response, auto_ack=True)
 
-    # Esperar respuestas durante un tiempo determinado (e.g., 10 segundos)
+    # Wait for responses
     print("Waiting for responses. To exit, press CTRL+C")
     while True:
         try:
@@ -367,12 +360,12 @@ def discoverChatP(user: ChatClient):
         except KeyboardInterrupt:
             break
 
-    # Mostrar respuestas recibidas en la interfaz de usuario
+    # Print responses
     print("\nResponses received:")
     for response in responses:
         print(f"User: {response['username']}, Connection parameters: {response['connection_params']}")
 
-    # Cerrar la conexión
+    # Close connection
     connection.close()
 
 
@@ -380,20 +373,20 @@ def discoverChatR(user: ChatClient):
     connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
     channel = connection.channel()
 
-    # Declarar el intercambio
+    # Declare exchange
     channel.exchange_declare(exchange='chat_discovery', exchange_type='fanout')
 
-    # Declarar una cola para este cliente
+    # Declare a queue for this client
     result = channel.queue_declare(queue='', exclusive=True)
     queue_name = result.method.queue
 
-    # Vincular la cola al intercambio
+    # Bind the queue to the exchange
     channel.queue_bind(exchange='chat_discovery', queue=queue_name)
 
     def on_discovery_event(ch, method, properties, body):
         message = json.loads(body.decode())
         if message['type'] == 'discovery_request':
-            # Responder con parámetros de conexión al reply_to especificado
+            # Respond to the discovery event
             response_event = {
                 'username': user.name,
                 'connection_params': user.connection,
@@ -403,7 +396,7 @@ def discoverChatR(user: ChatClient):
                                   body=json.dumps(response_event).encode())
             print(f"Responded to {message['username']} discovery event.")
 
-    # Configurar suscripción en la cola
+    # Configure subscription in the queue
     channel.basic_consume(queue=queue_name, on_message_callback=on_discovery_event, auto_ack=True)
 
     print("Waiting for discovery events. To exit, press CTRL+C")
