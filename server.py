@@ -70,6 +70,7 @@ def serve():
     except KeyboardInterrupt:
         print("Server stopped by user.")
         server.stop(0)
+        return
 
 
 if __name__ == '__main__':
