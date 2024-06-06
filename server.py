@@ -9,9 +9,11 @@ from concurrent import futures
 import redis
 
 
+# create a class to define the server functions, derived from
+# name_server_pb2_grpc.NameServerServicer
 class NameServerServicer(name_server_pb2_grpc.NameServerServicer):
     def __init__(self):
-        # Conectar a Redis
+        # Connect to Redis
         self.redis_client = redis.Redis(host='localhost', port=6379, db=0)
 
     def GetClientInfo(self, request, context):
@@ -20,6 +22,7 @@ class NameServerServicer(name_server_pb2_grpc.NameServerServicer):
         # Obtain from Redis the client address and port
         client_redis = self.redis_client.get(client_name)
 
+        # If the client is not in the Redis database, return an error
         if client_redis is None:
             client_ip_port = name_server_pb2.GetClientInfoResponse(
                 errorInfo=name_server_pb2.ErrorInfo(error_message=1)
@@ -43,6 +46,7 @@ class NameServerServicer(name_server_pb2_grpc.NameServerServicer):
 
 
 def serve():
+    # Create a gRPC server
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     name_server_pb2_grpc.add_NameServerServicer_to_server(NameServerServicer(), server)
     server.add_insecure_port('0.0.0.0:50051')
@@ -52,10 +56,11 @@ def serve():
     redis_channel = grpc.insecure_channel('0.0.0.0:50051')
     redis_stub = name_server_pb2_grpc.NameServerStub(redis_channel)
 
-    # Leer el archivo YAML
+    # Read clients from yaml file
     with open('clients.yaml', 'r') as file:
         data = yaml.safe_load(file)
 
+    # Add clients to NameServer
     for client in data['clients']:
         name = client['name']
         client_ip_address = client['ip'] + ':' + str(client['port'])

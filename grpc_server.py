@@ -6,7 +6,7 @@ from concurrent import futures
 
 
 # create a class to define the server functions, derived from
-# insultingServer_pb2_grpc.InsultingServiceServicer
+# private_chat_pb2_grpc.PrivateChatServiceServicer
 class PrivateChatServicer(private_chat_pb2_grpc.PrivateChatServiceServicer):
 
     def sendMessage(self, request, context):

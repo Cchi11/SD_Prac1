@@ -78,15 +78,15 @@ def privateChat(user: ChatClient):
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     private_chat_pb2_grpc.add_PrivateChatServiceServicer_to_server(
         PrivateChatServicer(), server)
-    # listen on client port
-    # print('Starting server. Listening on port: ' + user.connection + '.')
+
     server.add_insecure_port(user.connection)
     server.start()
-    # get other client address
+
     stub = None
     channel = None
 
     try:
+        # Connect to the other client
         while True:
             other_client_name = input('Enter other client_name: ')
             if other_client_name == user.name:
@@ -98,6 +98,7 @@ def privateChat(user: ChatClient):
             other_client = name_server_pb2.ClientNameRequest(client_name=other_client_name)
             other_client_grpc = redis_stub.GetClientInfo(other_client)
             other_client_address = None
+            # Check if the client is active
             if other_client_grpc.connectionInfo.client_address_and_port:
                 other_client_address = other_client_grpc.connectionInfo.client_address_and_port
 
@@ -126,12 +127,13 @@ def privateChat(user: ChatClient):
         return
 
     try:
+        # Send messages
         while True:
-
             input_message = input()
             message = private_chat_pb2.clientMessage(clientName=user.name, clientMessage=input_message)
             try:
                 response = stub.sendMessage(message)
+            # If the other client is offline
             except grpc.RpcError as e:
                 print()
                 print('Error sending message ' + other_client_name + ', he/she is offline right now.')
@@ -140,6 +142,7 @@ def privateChat(user: ChatClient):
             time.sleep(0.5)
 
     except KeyboardInterrupt:
+        # Return to main menu
         server.stop(0)
         channel.close()
         print()
@@ -149,9 +152,11 @@ def privateChat(user: ChatClient):
 def GroupChat(user: ChatClient):
     choice = printMenuGrupalChat()
 
+    # persistent group chat
     if choice == '1':
         GroupChatP(user)
     else:
+        # transient group chat
         if choice == '2':
             GroupChatT(user)
         else:
@@ -186,10 +191,11 @@ def GroupChatT(user: ChatClient):
         result = channel.queue_declare(queue=queue_name, exclusive=True)
         queue_name = result.method.queue
 
-        # Asocia cada cola al exchange
+        # Associate each queue to the exchange
         channel.queue_bind(exchange=group_name, queue=queue_name)
 
         def callback(ch, method, properties, body):
+            # Do not print messages twice sent by the same user
             if properties.headers['sender'] != user.name:
                 print(body.decode())
 
@@ -205,18 +211,19 @@ def GroupChatT(user: ChatClient):
             while True:
 
                 try:
+                    # Receive messages
                     channel.start_consuming()
-
                 except KeyboardInterrupt:
+                    # Send messages
                     print()
                     message = input("[" + user.name + "] ")
                     message = '[' + user.name + '] ' + message
                     channel.basic_publish(exchange=group_name, routing_key='', body=message.encode(),
                                           properties=pika.BasicProperties(headers={'sender': user.name}))
-                    # print(f" [x] Sent {message}")
                     continue
 
         except KeyboardInterrupt:
+            # Return to main menu
             print()
             print('Exiting GroupChat...')
             connection.close()
@@ -257,6 +264,7 @@ def GroupChatP(user: ChatClient):
         channel.queue_bind(exchange=group_name, queue=queue_name)
 
         def callback(ch, method, properties, body):
+            # Do not print messages twice sent by the same user
             if properties.headers['sender'] != user.name:
                 print(body.decode())
 
@@ -271,8 +279,10 @@ def GroupChatP(user: ChatClient):
         try:
             while True:
                 try:
+                    # Receive messages
                     channel.start_consuming()
                 except KeyboardInterrupt:
+                    # Send messages
                     print()
                     message = input("[" + user.name + "] ")
                     message = '[' + user.name + '] ' + message
@@ -281,9 +291,9 @@ def GroupChatP(user: ChatClient):
                                               headers={'sender': user.name},
                                               delivery_mode=2  # Make message persistent
                                           ))
-                    # print(f" [x] Sent {message}")
                     continue
         except KeyboardInterrupt:
+            # Return to main menu
             print()
             print('Exiting GroupChat...')
             connection.close()
@@ -329,11 +339,13 @@ def accessInsultChannel(user_client: ChatClient):
             options = input('Enter option: ')
 
             if options == '1':
+                # Send insult
                 insult_string = input('Enter insult: ')
                 insult_string = '[' + user_client.name + '] ' + insult_string
                 send_insult(insult_string)
             elif options == '2':
                 try:
+                    # Receive insults
                     print()
                     print("=" * 60)
                     print('Receiving insults. Press Ctrl+C to stop receiving insults')
@@ -347,6 +359,7 @@ def accessInsultChannel(user_client: ChatClient):
 
         connection.close()
     except KeyboardInterrupt:
+        # Return to main menu
         connection.close()
         return
 
