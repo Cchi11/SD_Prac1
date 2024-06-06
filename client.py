@@ -1,11 +1,9 @@
-import threading
+import json
 import time
 from concurrent import futures
 
 import grpc
 import pika
-import yaml
-import random
 
 from pika.exceptions import ChannelClosedByBroker
 
@@ -14,7 +12,6 @@ import private_chat_pb2
 import private_chat_pb2_grpc
 import name_server_pb2
 import name_server_pb2_grpc
-import socket
 
 from grpc_server import PrivateChatServicer
 
@@ -62,6 +59,26 @@ def printMenuGrupalChat():
             print("=" * 45)
             print(f"{'| 1. Persistent Group Chat':<44}{'|':>1}")
             print(f"{'| 2. Transient Group Chat':<44}{'|':>1}")
+            print("=" * 45)
+
+            choice = input("Select an option (1 or 2): ")
+
+            if choice in ['1', '2']:
+                return choice
+            else:
+                print("Invalid choice. Please select either 1 or 2.")
+    except KeyboardInterrupt:
+        return None
+
+
+def printMenudiscoverChat():
+    try:
+        while True:
+            print("=" * 45)
+            print(f"{'|':<2}{' Group Chat Options ':^41}{'|':>2}")
+            print("=" * 45)
+            print(f"{'| 1. Publish a Discovery Event':<44}{'|':>1}")
+            print(f"{'| 2. Respond to a Discovery Event':<44}{'|':>1}")
             print("=" * 45)
 
             choice = input("Select an option (1 or 2): ")
@@ -303,8 +320,101 @@ def GroupChatP(user: ChatClient):
         return
 
 
-def discoverChat():
-    pass
+def discoverChat(user: ChatClient):
+    choice = printMenuGrupalChat()
+
+    if choice == '1':
+        discoverChatP(user)
+    else:
+        if choice == '2':
+            discoverChatR(user)
+        else:
+            return
+
+
+def discoverChatP(user: ChatClient):
+    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    channel = connection.channel()
+
+    # Declare exchange
+    channel.exchange_declare(exchange='chat_discovery', exchange_type='fanout')
+
+    # Declare a queue for this client
+    result = channel.queue_declare(queue='', exclusive=True)
+    queue_name = result.method.queue
+
+    # Publish a discovery event
+    discovery_event = {
+        'username': user.name,
+        'type': 'discovery_request',
+        'reply_to': queue_name
+    }
+    channel.basic_publish(exchange='chat_discovery', routing_key='', body=json.dumps(discovery_event).encode())
+    print("Public event of discovery.")
+
+    responses = []
+
+    def on_response(ch, method, properties, body):
+        message = json.loads(body.decode())
+        if message['type'] == 'discovery_response':
+            responses.append(message)
+
+    # Configure subscription in the queue
+    channel.basic_consume(queue=queue_name, on_message_callback=on_response, auto_ack=True)
+
+    # Wait for responses
+    print("Waiting for responses. To exit, press CTRL+C")
+    while True:
+        try:
+            channel.start_consuming()
+        except KeyboardInterrupt:
+            break
+
+    # Print responses
+    print("\nResponses received:")
+    for response in responses:
+        print(f"User: {response['username']}, Connection parameters: {response['connection_params']}")
+
+    # Close connection
+    connection.close()
+
+
+def discoverChatR(user: ChatClient):
+    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    channel = connection.channel()
+
+    # Declare exchange
+    channel.exchange_declare(exchange='chat_discovery', exchange_type='fanout')
+
+    # Declare a queue for this client
+    result = channel.queue_declare(queue='', exclusive=True)
+    queue_name = result.method.queue
+
+    # Bind the queue to the exchange
+    channel.queue_bind(exchange='chat_discovery', queue=queue_name)
+
+    def on_discovery_event(ch, method, properties, body):
+        message = json.loads(body.decode())
+        if message['type'] == 'discovery_request':
+            # Respond to the discovery event
+            response_event = {
+                'username': user.name,
+                'connection_params': user.connection,
+                'type': 'discovery_response'
+            }
+            channel.basic_publish(exchange='', routing_key=message['reply_to'],
+                                  body=json.dumps(response_event).encode())
+            print(f"Responded to {message['username']} discovery event.")
+
+    # Configure subscription in the queue
+    channel.basic_consume(queue=queue_name, on_message_callback=on_discovery_event, auto_ack=True)
+
+    print("Waiting for discovery events. To exit, press CTRL+C")
+    try:
+        channel.start_consuming()
+    except KeyboardInterrupt:
+        channel.stop_consuming()
+        connection.close()
 
 
 def accessInsultChannel(user_client: ChatClient):
@@ -375,7 +485,12 @@ redis_stub = name_server_pb2_grpc.NameServerStub(redis_channel)
 # log in
 while True:
     printHeader(' LOG IN TO USE CHAT APPLICATION')
-    self_name = input('Enter your name: ')
+    try:
+        self_name = input('Enter your name: ')
+    except KeyboardInterrupt:
+        print()
+        print('Exiting...')
+        exit()
     self_client = name_server_pb2.ClientNameRequest(client_name=self_name)
     self_client_address = redis_stub.GetClientInfo(self_client)
 
@@ -402,7 +517,8 @@ try:
             printHeader(' SUBSCRIBE TO GROUP CHAT')
             GroupChat(client)
         elif option == '3':
-            print('Discover chat')
+            printHeader(' DISCOVER CHAT')
+            discoverChat(client)
         elif option == '4':
             printHeader(' INSULT CHANNEL')
             accessInsultChannel(client)
