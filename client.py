@@ -15,7 +15,9 @@ import private_chat_pb2_grpc
 import name_server_pb2
 import name_server_pb2_grpc
 import socket
+import requests
 
+from requests.auth import HTTPBasicAuth
 from grpc_server import PrivateChatServicer
 
 
@@ -293,7 +295,33 @@ def GroupChatP(user: ChatClient):
 
 
 def discoverChat():
-    pass
+    # RabbitMQ
+    rabbitmq_host = 'localhost'
+    rabbitmq_port = 15672
+    username = 'guest'
+    password = 'guest'
+
+    # URL
+    url = f'http://{rabbitmq_host}:{rabbitmq_port}/api/exchanges'
+
+    # Get request
+    response = requests.get(url, auth=HTTPBasicAuth(username, password))
+
+    # List of default exchanges
+    default_exchanges = ['', 'amq.direct', 'amq.fanout', 'amq.headers', 'amq.match', 'amq.rabbitmq.trace', 'amq.topic']
+
+    # Check response
+    if response.status_code == 200:
+        exchanges = response.json()
+        print("Lista de exchanges creados por el usuario:")
+        # Print exchanges
+        for exchange in exchanges:
+            # Check if exchange is not a default exchange
+            if exchange['name'] not in default_exchanges:
+                print(f"Name: {exchange['name']}")
+    else:
+        print(f"Error: {response.status_code}")
+        print(response.text)
 
 
 def accessInsultChannel(user_client: ChatClient):
@@ -359,7 +387,12 @@ redis_stub = name_server_pb2_grpc.NameServerStub(redis_channel)
 # log in
 while True:
     printHeader(' LOG IN TO USE CHAT APPLICATION')
-    self_name = input('Enter your name: ')
+    try:
+        self_name = input('Enter your name: ')
+    except KeyboardInterrupt:
+        print()
+        print('Exiting...')
+        exit()
     self_client = name_server_pb2.ClientNameRequest(client_name=self_name)
     self_client_address = redis_stub.GetClientInfo(self_client)
 
@@ -386,7 +419,8 @@ try:
             printHeader(' SUBSCRIBE TO GROUP CHAT')
             GroupChat(client)
         elif option == '3':
-            print('Discover chat')
+            printHeader(' DISCOVER CHAT')
+            discoverChat()
         elif option == '4':
             printHeader(' INSULT CHANNEL')
             accessInsultChannel(client)
