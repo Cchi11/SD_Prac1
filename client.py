@@ -475,7 +475,7 @@ def accessInsultChannel(user_client: ChatClient):
 
 
 # -----------------------------------------------------------------------------------------------------------------------
-# Main - start code
+# Main - start the client
 
 
 # Connect to NameServer
