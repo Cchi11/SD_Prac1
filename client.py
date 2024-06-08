@@ -321,7 +321,7 @@ def GroupChatP(user: ChatClient):
 
 
 def discoverChat(user: ChatClient):
-    choice = printMenuGrupalChat()
+    choice = printMenudiscoverChat()
 
     if choice == '1':
         discoverChatP(user)
@@ -523,6 +523,8 @@ try:
             printHeader(' INSULT CHANNEL')
             accessInsultChannel(client)
         elif option == '5':
+            print('Exiting...')
+            print()
             break
         else:
             print('Invalid option')
